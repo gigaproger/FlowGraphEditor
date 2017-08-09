@@ -278,9 +278,35 @@ class GraphScheme(object):
     self.linkNodes(nid3, nid4, 0, 0)
     
   # загрузить из файла 
-  def load(self, fileName):
-    pass
-  
+  def load(self, filePath):
+
+    self.clear()
+    
+    content = dict()
+    
+    with open(filePath, "r", encoding="utf-8") as file:
+      content = json.load(file)
+    
+#    print(content)
+    
+    for n in content['nodes']:
+      nodeClass = getattr(sys.modules[__name__], n['t'])
+      self.nodes[ n['id'] ] = nodeClass(n['id'], n['n'], int(n['x']), int(n['y']), int(n['w']), int(n['h']) )
+
+    for l in content['links']:
+      self.linkNodes( int(l['no']), int(l['ni']), int(l['so']), int(l['si']) )
+
   # сохранить в файл
-  def save(self, fileName):
-    pass
+  def save(self, filePath):
+    content = {'nodes' : list(), 'links' : list() }
+    
+    for node in self.nodes.values():
+      nc =  { 't' : node.__class__.__name__, 'id' : node.id, 'n' : node.name, 'x' : node.left, 'y':node.top, 'w' : node.width, 'h' : node.height }
+      content['nodes'].append(nc)
+
+    for link in self.links.values():
+      lc =  { 'id' : link.id, 'no' : link.nodeOutID, 'ni' : link.nodeInID, 'so' : link.socketOutIndex, 'si' : link.socketInIndex }
+      content['links'].append(lc)
+      
+    with open(filePath, "w", encoding="utf-8") as file:
+      json.dump(content, file)
