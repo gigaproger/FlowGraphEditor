@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QWidget, QTableView, QHBoxLayout, QVBoxLayout, QPushButton, QFrame 
+from PyQt5.QtWidgets import QWidget, QTableView, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QFileDialog
 from WCanvas import WCanvas
 from NodeTableModel import NodeTableModel
 from FlowGraphCore import GraphScheme
@@ -11,7 +11,9 @@ class WMain(QWidget):
     super().__init__()
 
     self.scheme = GraphScheme()    
-    self.scheme.makeTestScheme()
+#    self.scheme.makeTestScheme()
+#    self.scheme.save('D:/ZZ/000.json')
+#    self.scheme.load('D:/ZZ/000.json')
     
     self.initUI()
 
@@ -56,3 +58,19 @@ class WMain(QWidget):
     mainBox.addLayout(centralBox)
     
     self.setLayout(mainBox)
+    
+    # карта сигналов-слотов
+    self.pbOpen.clicked.connect(self.onOpenScheme)
+    self.pbSave.clicked.connect(self.onSaveScheme)
+    
+  def onOpenScheme(self):
+    filePath = QFileDialog.getOpenFileName(self, 'Открыть схему', '.')
+
+    if filePath[0]:
+      self.scheme.load(filePath[0])
+      self.canvas.repaint()
+      
+    
+  def onSaveScheme(self):
+    pass
+    
