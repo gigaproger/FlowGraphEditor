@@ -1,7 +1,8 @@
 import sys
 import json
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import QLineF
+from PyQt5.QtGui import QPixmap, QPolygonF
+from PyQt5.QtCore import QLineF, QPointF, QRectF, Qt
+
 
 # Сокет
 class GraphSocket(object):
@@ -51,15 +52,15 @@ class GraphNode(object):
 
   def attachLink(self, direction, socketIndex, linkID):
     if direction == 'I':
-      self.inputSockets[socketIndex].linkId = linkID
+      self.inputSockets[socketIndex].linkID = linkID
     elif direction == 'O':
-      self.outputSockets[socketIndex].linkId = linkID
+      self.outputSockets[socketIndex].linkID = linkID
  
   def detachLink(self, direction, socketIndex):
     if direction == 'I':
-      self.inputSockets[socketIndex].linkId = None
+      self.inputSockets[socketIndex].linkID = None
     elif direction == 'O':
-      self.outputSockets[socketIndex].linkId = None
+      self.outputSockets[socketIndex].linkID = None
       
   def arrangeSockets(self, direction):
     ss = None
@@ -96,8 +97,8 @@ class GraphNode(object):
 # Узел Источник
 class NSource(GraphNode):
 
-  def __init__(self, id, name, x, y, w, h):
-    super().__init__(id, name, x, y, w, h)
+  def __init__(self, id, x, y, w, h):
+    super().__init__(id, 'Источник', x, y, w, h)
 
   def pictureFileName(self):
     return 'images/Source.png'
@@ -111,8 +112,8 @@ class NSource(GraphNode):
 # Узел Сумматор
 class NAdder(GraphNode):
 
-  def __init__(self, id, name, x, y, w, h):
-    super().__init__(id, name, x, y, w, h)
+  def __init__(self, id, x, y, w, h):
+    super().__init__(id, 'Сумматор', x, y, w, h)
 
   def pictureFileName(self):
     return 'images/Adder.png'
@@ -129,8 +130,8 @@ class NAdder(GraphNode):
 # Узел Усилитель
 class NAmplifier(GraphNode):
 
-  def __init__(self, id, name, x, y, w, h):
-    super().__init__(id, name, x, y, w, h)
+  def __init__(self, id, x, y, w, h):
+    super().__init__(id, 'Усилитель', x, y, w, h)
 
   def pictureFileName(self):
     return 'images/Amplifier.png'
@@ -145,8 +146,8 @@ class NAmplifier(GraphNode):
 
 # Узел Ветвление
 class NCondition(GraphNode):
-  def __init__(self, id, name, x, y, w, h):
-    super().__init__(id, name, x, y, w, h)
+  def __init__(self, id, x, y, w, h):
+    super().__init__(id, 'Ветвление', x, y, w, h)
 
   def pictureFileName(self):
     return 'images/Condition.png'
@@ -172,25 +173,36 @@ class GraphLink(object):
 class GraphScheme(object):
  
   def __init__(self):
-    self.nodes = dict()
-    self.links = dict()
-    self.nextID = 1
+    self.filePath = '' # путь к файлу схемы
+    self.nodes = dict() # узлы
+    self.links = dict() # связи
+    self.nextID = 1     # id для следующего создаваемого объекта
+    self.selectionType = '-' # тип выделения: '-' - ничего не выделено, 'N' - узлы, 'L' - связьб
+    self.selection = set() # множество выделенных объектов
   
   # очистить схему
   def clear(self):
     self.nodes.clear()
     self.links.clear()    
+  
+  # создать узел с 0-ым id и вернуть его
+  def createNode(self, typeName, x, y, w, h):
+    nodeClass = getattr(sys.modules[__name__], typeName)
+    node = nodeClass(0, x, y, w, h)
+    return node
+  
+  # создать узел и добавить его в схему
+  def addNode(self, typeName, x, y, w, h):
     
-  # создать узел
-  def createNode(self, typeName, name, x, y, w, h):
+    node = self.createNode(typeName, x, y, w, h)
     
     newID = self.nextID
     
     self.nextID += 1
     
-    nodeClass = getattr(sys.modules[__name__], typeName)
+    node.id = newID
     
-    self.nodes[newID] = nodeClass(newID, name, x, y, w, h)
+    self.nodes[newID] = node
   
     return newID
     
@@ -199,7 +211,7 @@ class GraphScheme(object):
     
     if nodeID in self.nodes:
       node = self.nodes[nodeID]
-      
+ 
       for socket in node.inputSockets:
         self.removeLink(socket.linkID)
 
@@ -210,9 +222,9 @@ class GraphScheme(object):
   
   # удалить связь
   def removeLink(self, linkID):
-  
+    
     if linkID in self.links:
-
+    
       link = self.links[linkID]
      
       nodeOut = self.nodes[link.nodeOutID]
@@ -221,29 +233,60 @@ class GraphScheme(object):
       nodeIn.detachLink('I',  link.socketInIndex)
        
       del self.links[linkID]    
-  
+    
   
   # соединить связью два узла
-  def linkNodes(self, nodeOutID, nodeInID, socketOutIndex, socketInIndex):
+  def linkNodes(self, nodeOutID, nodeInID, socketOutIndex, socketInIndex, linkID):
   
     if nodeOutID in self.nodes and nodeInID in self.nodes:
       
-      newID = self.nextID
-    
-      self.nextID += 1
       
-      self.links[newID] = GraphLink(newID, nodeOutID, nodeInID, socketOutIndex, socketInIndex)
+      if linkID == 0:
+        oid = self.nextID
+        self.nextID += 1
+      else:
+        oid = linkID
+      
+      self.links[oid] = GraphLink(oid, nodeOutID, nodeInID, socketOutIndex, socketInIndex)
     
       nodeOut = self.nodes[nodeOutID]
       nodeIn  = self.nodes[nodeInID]
     
-      nodeOut.attachLink('O', socketOutIndex, newID)
-      nodeIn.attachLink('I', socketInIndex, newID)
+      nodeOut.attachLink('O', socketOutIndex, oid)
+      nodeIn.attachLink('I', socketInIndex, oid)
     
-      return newID
+      return oid
       
     return 0
 
+  # очистить выделение
+  def clearSelection(self):
+    self.selectionType = '-'
+    self.selection.clear()
+
+
+  # добавить связь в выделение
+  def addLinkToSelection(self, linkID):
+    self.selectionType = 'L'
+    self.selection.clear()
+    self.selection.add(linkID)
+
+  # добавить узел в выделение
+  def addNodeToSelection(self, nodeID):
+  
+    if self.selectionType != 'N':
+      self.selectionType = 'N'
+      self.selection.clear()
+      
+    self.selection.add(nodeID)
+
+  # удалить узел из выделения
+  def removeNodeFromSelection(self, nodeID):
+      
+    if self.selectionType == 'N' and nodeID in self.selection:
+      self.selection.remove(nodeID)
+  
+    
   # выдать координаты линии связи
   def calcLinkLine(self, linkID):
     
@@ -265,6 +308,131 @@ class GraphScheme(object):
     
     return QLineF(xo, yo, xi, yi)
     
+  # выдать окружающий линию связи полигон
+  def linkBoundingPolygon(self, linkID):
+    linkLine = self.calcLinkLine(linkID)
+    
+    if not (linkLine is None):
+      nv = linkLine.normalVector()
+      nv.setLength(5)
+      
+      pp = QLineF(nv.p2(), nv.p1())
+      
+      s1 = pp.normalVector()
+      s1.setLength( linkLine.length() )
+      
+      nv = linkLine.normalVector()
+      nv.setLength(-5)
+      pp = QLineF(nv.p2(), nv.p1())
+      
+      s2 = pp.normalVector()
+      s2.setLength(-linkLine.length())
+  
+      ret = QPolygonF()
+      ret.append(s1.p1())
+      ret.append(s1.p2())
+      ret.append(s2.p2())
+      ret.append(s2.p1())
+      
+      return ret
+  
+    return None
+  
+  # выдать точку присоединения связи к сокету
+  def socketLinkPoint(self, nodeID, socketType, socketIndex):
+
+    ret = QPointF()
+    
+    if nodeID in self.nodes:
+      node = self.nodes[nodeID]
+      
+      if socketType == 'I':
+      
+        if socketIndex >= 0 and socketIndex < len(node.inputSockets):
+          
+          socket = node.inputSockets[socketIndex]
+          ret    = QPointF(node.left, node.top + socket.top + socket.height / 2.0)
+          
+      elif socketType == 'O':
+
+        if socketIndex >= 0 and socketIndex < len(node.outputSockets):
+          
+          socket = node.outputSockets[socketIndex]
+          ret    = QPointF(node.left + node.width, node.top + socket.top + socket.height / 2.0)
+  
+    return ret
+  
+  # поиск объекта в точке
+  def objectAtPoint( self, point ):
+    
+    objectType = '-'
+    objectID = 0
+    nodeID   = 0
+    
+    for node in self.nodes.values():
+    
+      r = QRectF(node.left, node.top, node.width, node.height)
+      
+      if r.contains( point ):
+
+        objectType = 'N'
+        objectID = node.id
+        nodeID   = node.id
+        
+        i = 0
+        
+        for socket in node.inputSockets:
+        
+          sr = QRectF(node.left + socket.left, node.top + socket.top, socket.width, socket.height)
+          
+          if sr.contains( point ):
+            objectType = 'SI'
+            objectID   = i
+            break
+            
+          i += 1
+
+        if objectType != 'SI':
+        
+          i = 0
+          
+          for socket in node.outputSockets:
+          
+            sr = QRectF(node.left + socket.left, node.top + socket.top, socket.width, socket.height)
+            
+            if sr.contains( point ):
+              objectType = 'SO'
+              objectID   = i
+              break
+              
+            i += 1
+
+        break
+    
+    if objectType != 'N':
+    
+      for link in self.links.values():
+        po = self.linkBoundingPolygon(link.id)
+
+        if not (po is None):
+          if po.containsPoint( point, Qt.WindingFill ):
+            objectType = 'L'
+            objectID = link.id
+            break
+
+        
+    return (objectType, nodeID, objectID)
+  
+  # пермещение выделенных узлов 
+  def moveSelectedNodes(self, dx, dy):
+    
+    if self.selectionType == 'N':
+      for nodeID in self.selection:
+        node = self.nodes[nodeID]
+        node.left += dx
+        node.top += dy
+        
+  
   # формирование тестовой схемы
   def makeTestScheme(self):
     
@@ -280,22 +448,35 @@ class GraphScheme(object):
   # загрузить из файла 
   def load(self, filePath):
 
+    maxID = 0
+    oid = 0
+    
     self.clear()
     
     content = dict()
     
     with open(filePath, "r", encoding="utf-8") as file:
       content = json.load(file)
-    
-#    print(content)
-    
+       
     for n in content['nodes']:
+      oid = int(n['id'])
       nodeClass = getattr(sys.modules[__name__], n['t'])
-      self.nodes[ n['id'] ] = nodeClass(n['id'], n['n'], int(n['x']), int(n['y']), int(n['w']), int(n['h']) )
-
+      self.nodes[ oid ] = nodeClass(oid, int(n['x']), int(n['y']), int(n['w']), int(n['h']) )
+      
+      if maxID < oid:
+        maxID = oid
+        
     for l in content['links']:
-      self.linkNodes( int(l['no']), int(l['ni']), int(l['so']), int(l['si']) )
+      oid = int(l['id'])
 
+      self.linkNodes( int(l['no']), int(l['ni']), int(l['so']), int(l['si']), oid )
+      
+      if maxID < oid:
+        maxID = oid
+      
+    self.nextID = maxID + 1
+    self.filePath = filePath
+    
   # сохранить в файл
   def save(self, filePath):
     content = {'nodes' : list(), 'links' : list() }
@@ -310,3 +491,5 @@ class GraphScheme(object):
       
     with open(filePath, "w", encoding="utf-8") as file:
       json.dump(content, file)
+
+    self.filePath = filePath  

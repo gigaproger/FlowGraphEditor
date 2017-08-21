@@ -1,6 +1,9 @@
 import sys
-from PyQt5.QtWidgets import QWidget, QTableView, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QFileDialog
+from PyQt5.QtWidgets import QWidget, QTableView, QAbstractItemView, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QFileDialog
+from PyQt5.QtCore import Qt
 from WCanvas import WCanvas
+from NodeView import NodeView
+
 from NodeTableModel import NodeTableModel
 from FlowGraphCore import GraphScheme
 
@@ -18,24 +21,24 @@ class WMain(QWidget):
     self.initUI()
 
   def initUI(self):
-    self.setWindowTitle('Редактор вычислительного графа')
+    self.setWindowTitle('Редактор вычислительного графа - Новая Схема')
+    self.setAcceptDrops(False)
     
     # панель команд
     self.frControl = QFrame()
     self.pbOpen = QPushButton('Открыть')
     self.pbSave = QPushButton('Сохранить')
-        
-    
     
     # набор узлов
     self.nodeModel = NodeTableModel()
         
-    self.nodeView = QTableView()
+    self.nodeView = NodeView()
     self.nodeView.setMaximumWidth(200)
     self.nodeView.setModel(self.nodeModel)
-    
+    self.nodeView.setDragDropMode(QAbstractItemView.DragOnly)
     
     self.canvas = WCanvas()
+    self.canvas.setFocusPolicy(Qt.StrongFocus)
     self.canvas.scheme = self.scheme
     
 
@@ -69,8 +72,20 @@ class WMain(QWidget):
     if filePath[0]:
       self.scheme.load(filePath[0])
       self.canvas.repaint()
-      
+      self.canvas.setFocus()
+      title = 'Редактор вычислительного графа: ' + filePath[0]
+      self.setWindowTitle(title)
     
   def onSaveScheme(self):
-    pass
+    if self.scheme.filePath == '':
+      
+      filePath, _ = QFileDialog.getSaveFileName(self, 'Сохранить схему', '.')
     
+      if filePath:
+        self.scheme.save(filePath)
+        title = 'Редактор вычислительного графа: ' + filePath
+        self.setWindowTitle(title)
+    else:
+      self.scheme.save(self.scheme.filePath)
+      
+      

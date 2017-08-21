@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PyQt5.QtCore import QAbstractTableModel, QModelIndex, QMimeData, Qt
 from PyQt5.QtGui  import QIcon
 
 class NodeTypeInfo(object):
@@ -50,5 +50,26 @@ class NodeTableModel(QAbstractTableModel):
     if orientation == Qt.Horizontal and role == Qt.DisplayRole:
       return 'Блоки'
   
+    return None
+    
+  def  flags(self, index):
+    
+    ff = QAbstractTableModel.flags(self, index)
+    ff |= Qt.ItemIsDragEnabled
+  
+    return ff
+    
+  def mimeData(self, indexes):
+   
+    if len(indexes) > 0:
+    
+      index = indexes[0]
+      
+      if index.isValid():
+     
+        mimeData = QMimeData()     
+        mimeData.setText(self.nodes[index.row()].className)
+        return mimeData
+    
     return None
 
